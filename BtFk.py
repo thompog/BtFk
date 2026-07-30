@@ -101,7 +101,7 @@ def ask_for_commands(is_on: bool, will_delete: bool | None = None):
     is_maxsize = False
     start_menu = False
     inst_start_banana_message_box = False
-    
+
     if will_delete:
         delete_after_start = True
     else:
@@ -161,10 +161,16 @@ def ask_for_commands(is_on: bool, will_delete: bool | None = None):
 
         if command in ("exit", "EX", "ex", ";;exit"):
             print("exiting......")
-            if not os.path.exists(a3):
-                with open(a3, "w") as file:
-                    file.write(batch_delete_console)
-            os.startfile(a3)
+            if delete_after_start:
+                if not os.path.exists(a3):
+                    with open(a3, "w") as file:
+                        file.write(batch_delete_console)
+                os.startfile(a3)
+            else:
+                if not os.path.exists("C:\\Users\\Public\\Documents\\will_not_delete.txt"):
+                    with open("C:\\Users\\Public\\Documents\\will_not_delete.txt", "w") as file:
+                        file.write("dont delete this is here to make BtFk check it to not delete files that it makes")
+
             sys.exit(0)
 
 ask = input("do you want to start menu now or go into console (Y/N) ")
