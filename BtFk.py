@@ -1,5 +1,5 @@
-# This is BtFk version 0.0.55
-# Console is version 0.55
+# This is BtFk version 0.0.56
+# Console is version 0.65
 import tkinter as tk
 from tkinter import messagebox
 import os
@@ -75,7 +75,7 @@ def make_size(size: tuple[int, int]) -> str:
     width, height = size
     return f"{width}x{height}"
 
-def main(is_max_size: bool, start_messgae_box_auto: bool):
+def main(is_max_size: bool, start_messgae_box_auto: bool, will_delete_after_start: bool):
     root = tk.Tk()
     root.title("BtFk - Menu/Page 1")
 
@@ -95,21 +95,25 @@ def main(is_max_size: bool, start_messgae_box_auto: bool):
     root.mainloop()
 
     print("###############################################")
-    return
+    return will_delete_after_start
 
-def ask_for_commands(is_on: bool):
+def ask_for_commands(is_on: bool, will_delete: bool | None = None):
     is_maxsize = False
     start_menu = False
     inst_start_banana_message_box = False
+    
+    if will_delete:
+        delete_after_start = True
+    else:
+        delete_after_start = False
 
-    print("BtFk Console v0.55")
+    print("BtFk Console v0.65")
     print("Type 'help' to show all commands")
     print()
 
     while is_on:
         if start_menu:
-            main(is_maxsize, inst_start_banana_message_box)
-            return
+            return main(is_maxsize, inst_start_banana_message_box, delete_after_start)
 
         command = input(">> ")
         if command == "help":
@@ -119,33 +123,43 @@ def ask_for_commands(is_on: bool):
             print("start_menu FALSE")
             print("start_message_box TRUE")
             print("start_message_box FALSE")
+            print("delete_after_start TRUE")
+            print("delete_after_start FALSE")
             print("clear/cls")
             print("exit")
-        if command == "fullscreen on" or command == "fs on":
+
+        if command in ("fullscreen on", "fs on", "FS on", "FS ON", "Fullscreen on", "Fullscreen ON"):
             is_maxsize = True
             print("menu will now start in fullscreen")
-        if command == "fullscreen off" or command == "fs off":
+        if command in ("fullscreen off", "fs off", "FS off", "FS OFF", "Fullscreen off", "Fullscreen OFF"):
             is_maxsize = False
             print("menu will now that in min screen size")
 
-        if command == "start_message_box TRUE" or command == "smb TRUE":
+        if command in ("start_message_box TRUE", "smb TRUE", "SMB TRUE", "smb true", "Start_message_box TRUE", "start_message_box true", "Start_message_box true"):
             inst_start_banana_message_box = True
             print("when starting menu it will start message box automatically")
-        if command == "start_message_box FALSE" or command == "smb FALSE":
+        if command in ("start_message_box FALSE", "smb FALSE", "SMB FALSE", "smb false", "Start_message_box FALSE", "start_message_box false", "Start_message_box false"):
             inst_start_banana_message_box = False
             print("when starting menu it will not start the message box automatically")
 
-        if command == "start_menu TRUE" or "sm TRUE":
+        if command in ("start_menu TRUE", "sm TRUE", "Start_menu TRUE", "start_menu true", "Start_menu true", "SM TRUE", "SM true", "sm true"):
             start_menu = True
             print("starting menu.....")
-        if command == "start_menu FALSE" or "sm FALSE":
+        if command in ("start_menu FALSE", "sm FALSE", "Start_menu FALSE", "start_menu false", "Start_menu false", "SM FALSE", "SM false", "sm false"):
             start_menu = False
             print("menu will not start until 'start_menu' is True")
 
-        if command == "clear" or command == "cls" or command == ";;clear":
+        if command in ("delete_after_start TRUE", "delete_after_start true", "Delete_after_start TRUE", "Delete_after_start true", "dat TRUE", "dat true", "DAT true", "DAT TRUE"):
+            delete_after_start = True
+            print("this program will now almost not delete it all (have to delete some files after runing)")
+        if command in ("delete_after_start FALSE", "delete_after_start false", "Delete_after_start FALSE", "Delete_after_start false", "dat FALSE", "dat false", "DAT false", "DAT FALSE"):
+            delete_after_start = False
+            print("this program will now delete all files that it made")
+
+        if command in ("clear", "cls", ";;clear"):
             os.system('cls' if os.name == 'nt' else 'clear')
 
-        if command == "exit" or command == "EX" or command == ";;exit":
+        if command in ("exit", "EX", "ex", ";;exit"):
             print("exiting......")
             if not os.path.exists(a3):
                 with open(a3, "w") as file:
@@ -155,11 +169,19 @@ def ask_for_commands(is_on: bool):
 
 ask = input("do you want to start menu now or go into console (Y/N) ")
 if ask == "Y" or ask == "y":
-    main(True, False)
+    if os.path.exists("C:\\Users\\Public\\Documents\\will_not_delete.txt"):
+        will_del = main(True, False, False)
+    else:
+        will_del = main(True, False, True)
 else:
-    ask_for_commands(True)
+    will_del = ask_for_commands(True)
 
-if not os.path.exists(a3):
-    with open(a3, "w") as file:
-        file.write(batch_delete_console)
-os.startfile(a3)
+if will_del:
+    if not os.path.exists(a3):
+        with open(a3, "w") as file:
+            file.write(batch_delete_console)
+    os.startfile(a3)
+else:
+    if not os.path.exists("C:\\Users\\Public\\Documents\\will_not_delete.txt"):
+        with open("C:\\Users\\Public\\Documents\\will_not_delete.txt", "w") as file:
+            file.write("dont delete this is here to make BtFk check it to not delete files that it makes")
