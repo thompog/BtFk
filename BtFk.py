@@ -255,7 +255,7 @@ def get_version_ID():
 
     if not verify_file_hash(
         path,
-        "151BA65D70CEEEA3F550E8C29C507DBF4D79C29B21FF1AC67E01A1EBA0B0AE8E"
+        "C4F878A9D73DCCAE304F445B374FE396389C62C0A751208EAB0F7FEC9816CFCC"
     ):
         os.remove(path)
         raise VersionIDError("0XTffffffaaaa-0XOffffffaaaa")
