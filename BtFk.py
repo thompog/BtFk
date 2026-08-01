@@ -1,9 +1,13 @@
-# This is BtFk version 0.0.56
+# This is BtFk version 0.0.66
 # Console is version 0.65
+# PVoVP = 0XTf/f/ffffaaaaaa-ffffaaaaaa
 import tkinter as tk
 from tkinter import messagebox
 import os
 import sys
+import platform
+from pathlib import Path
+import subprocess
 
 name_of_program = os.path.basename(__file__)
 fullpath = os.path.dirname(os.path.abspath(__file__))
@@ -68,6 +72,55 @@ print("###############################################")
 def make_messagebox():
     messagebox.askyesno("hello what you doing?", "banana")
 
+def play_media_file(file_path):
+    """
+    Opens a media file using the operating system's default player.
+    Accepts a string path or a pathlib.Path object.
+    """
+    if not os.path.exists(file_path):
+        print(f"Error: The file '{file_path}' does not exist.")
+        return False
+        
+    current_os = platform.system()
+    
+    try:
+        if current_os == "Windows":
+            os.startfile(file_path)
+        elif current_os == "Darwin":
+            subprocess.run(["open", file_path], check=True)
+        else:
+            subprocess.run(["xdg-open", file_path], check=True)
+        
+        print(f"Successfully started: {os.path.basename(file_path)}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to play file. Error: {e}")
+        return False
+
+def make_it_play(root: tk.Tk, dir_path: Path):
+    playable_extensions = (
+        ".mp4", ".m4v", ".mov", ".mkv", ".avi", ".wmv", ".flv", ".webm", ".mpg", ".mpeg", ".3gp", 
+        ".mp3", ".aac", ".wav", ".flac", ".m4a", ".ogg", ".opus", ".wma", ".alac", ".aiff"
+    )
+    
+    end_files = [
+        f.name for f in dir_path.iterdir() 
+        if f.is_file() and f.suffix.lower() in playable_extensions
+    ]
+
+    frame = tk.Frame(root)
+    frame.pack(padx=20, pady=20)
+
+    for one_end_file in end_files:
+        full_path = os.path.join(dir_path, one_end_file)
+        button = tk.Button(
+            frame, 
+            text=f"play: {one_end_file}?", 
+            command=lambda file_to_play=full_path: play_media_file(file_to_play)
+        )
+        button.pack(fill="x", pady=5)
+
 def make_size(size: tuple[int, int]) -> str:
     if size is None:
         return ""
@@ -91,6 +144,9 @@ def main(is_max_size: bool, start_messgae_box_auto: bool, will_delete_after_star
 
     Button_1 = tk.Button(root, text='does somthing', command=make_messagebox)
     Button_1.pack(padx=20, pady=20)
+
+    Button_2 = tk.Button(root, text='make it play', command=lambda: make_it_play(root, Path(fullpath)))
+    Button_2.pack(padx=20, pady=30)
 
     root.mainloop()
 
