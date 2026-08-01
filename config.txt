@@ -1,3 +1,5 @@
 URLS;=
+https://github.com/thompog/BtFk/releases/download/verions/BtFk.py
 PATHS;=
+PATHHERE
 EOF;;
