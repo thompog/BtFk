@@ -1,6 +1,5 @@
 # This is BtFk version 0.0.66
 # Console is version 0.65
-# PVoVP = 0XTf/f/ffffaaaaaa-ffffaaaaaa
 import tkinter as tk
 from tkinter import messagebox
 import os
@@ -8,12 +7,22 @@ import sys
 import platform
 from pathlib import Path
 import subprocess
+import hashlib
+import requests as requ
 
 name_of_program = os.path.basename(__file__)
 fullpath = os.path.dirname(os.path.abspath(__file__))
 console_loation = os.path.join(os.environ["TEMP"], "console.py")
 a3 = os.path.join(fullpath, "del_console.bat")
 a2 = os.path.join(fullpath, "restart.bat")
+PVoVP_1 = "0XTf/f/ffffaaaaaa-ffffaaaaaa"
+PVOVP_2 = "0XTf/ffffaaaaaa-fffffaaaaa"
+
+class VersionIDError(Exception):
+    pass
+
+class FileHashError(Exception):
+    pass
 
 batch_restart = f"""
 @echo off
@@ -121,6 +130,86 @@ def make_it_play(root: tk.Tk, dir_path: Path):
         )
         button.pack(fill="x", pady=5)
 
+def verify_file_hash(file_path, expected_hash):
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+            
+    calculated_hash = sha256_hash.hexdigest()
+    return calculated_hash == expected_hash
+
+def install_installer():
+    global fullpath
+
+    path = os.path.join(fullpath, "config.txt")
+    path2 = os.path.join(fullpath, "installer.exe")
+
+    print("installing installer.exe...")
+
+    installer = requ.get(
+        "https://github.com/thompog/installer-helper/releases/download/versions/installer.helper.exe",
+        stream=True
+    )
+    installer.raise_for_status()
+
+    with open(path2, "wb") as file:
+        for chunk in installer.iter_content(chunk_size=8192):
+            file.write(chunk)
+
+    if not verify_file_hash(
+        path2,
+        "44FAA24155EFED76E0D24B997DA6F46464A2B7EBB49C23AE4128D5BC9F3CEBE5"
+    ):
+        os.remove(path2)
+        raise FileHashError(
+            "file hash is not the same as the website. "
+            "This can be a fake file with malware. "
+            "The file has been removed."
+        )
+
+    print("installing config.txt and replacing old lines...")
+
+    config_file = requ.get(
+        "https://raw.githubusercontent.com/thompog/BtFk/refs/heads/main/config.txt"
+    )
+    config_file.raise_for_status()
+
+    with open(path, "w") as file:
+        file.write(config_file.text)
+
+    if not verify_file_hash(
+        path,
+        "7CF038ED079D451F779E4D91A971C4B51DB04E3BBE4A20297C62F1B0C1D1B5E0"
+    ):
+        os.remove(path)
+        raise FileHashError(
+            "file hash is not the same as the website. "
+            "This can be a fake file with malware. "
+            "The file has been removed."
+        )
+
+    with open(path, "r") as file:
+        config_lines = file.read().splitlines()
+
+    new_config = []
+
+    for line in config_lines:
+        if line == "PATHHERE":
+            line = os.path.join(fullpath, "BtFk.py")
+
+        new_config.append(line)
+
+    with open(path, "w") as file:
+        file.write("\n".join(new_config))
+
+    print("running installer")
+    print()
+    print()
+    print()
+
+    subprocess.run([path2], check=True)
+
 def make_size(size: tuple[int, int]) -> str:
     if size is None:
         return ""
@@ -152,6 +241,94 @@ def main(is_max_size: bool, start_messgae_box_auto: bool, will_delete_after_star
 
     print("###############################################")
     return will_delete_after_start
+
+def get_version_ID():
+    global fullpath
+
+    path = os.path.join(fullpath, "ver.BtFk.txt")
+
+    version_file = requ.get("https://raw.githubusercontent.com/thompog/BtFk/refs/heads/main/ver.BtFk.txt")
+    version_file.raise_for_status()
+
+    with open(path, "w") as file:
+        file.write(version_file.text)
+
+    if not verify_file_hash(
+        path,
+        "151BA65D70CEEEA3F550E8C29C507DBF4D79C29B21FF1AC67E01A1EBA0B0AE8E"
+    ):
+        os.remove(path)
+        raise VersionIDError("0XTffffffaaaa-0XOffffffaaaa")
+
+    with open(path, "r") as file:
+        versions = file.read().splitlines()
+
+    ver1 = ""
+    ver2 = ""
+
+    for version in versions:
+        if version.startswith("PVoVP_1 = "):
+            version = version.replace("PVoVP_1 = ", "")
+            target = 1
+
+        elif version.startswith("PVOVP_2 = "):
+            version = version.replace("PVOVP_2 = ", "")
+            target = 2
+
+        else:
+            continue
+
+        decoded = ""
+
+        for c in version:
+            if c in ("0", "X", "T", "H", "O"):
+                continue
+            elif c == "/":
+                decoded += "."
+            elif c == "-":
+                decoded += "."
+            elif c == "f":
+                decoded += "0"
+            elif c == "a":
+                decoded += "1"
+            else:
+                decoded += c
+
+        if target == 1:
+            ver1 = decoded
+        else:
+            ver2 = decoded
+
+    if not ver1:
+        raise VersionIDError(
+            "0XTfffffffffa-0XHfffffffffa-0XOfffffffffa"
+        )
+
+    if not ver2:
+        raise VersionIDError(
+            "1XTfffffffffa-1XHfffffffffa-1XOfffffffffa"
+        )
+
+    return ver1, ver2
+
+def check_version_ID() -> bool:
+    global PVoVP_1
+    global PVOVP_2
+
+    old_PVoVP_1, old_PVoVP_2 = get_version_ID()
+
+    PVoVP_1_good = False
+    PVOVP_2_good = False
+
+    if old_PVoVP_1 == PVoVP_1:
+        PVoVP_1_good = True
+
+    if old_PVoVP_2 == PVOVP_2:
+        PVOVP_2_good = True
+
+    if PVoVP_1_good and PVOVP_2_good:
+        return True
+    return False
 
 def ask_for_commands(is_on: bool, will_delete: bool | None = None):
     is_maxsize = False
@@ -228,6 +405,18 @@ def ask_for_commands(is_on: bool, will_delete: bool | None = None):
                         file.write("dont delete this is here to make BtFk check it to not delete files that it makes")
 
             sys.exit(0)
+
+if not check_version_ID():
+    print("version ID is not the newest this means that you have and old version")
+    print("do you want to install installer for BtFk? (Y/N)")
+    ask = input(">> ")
+    if ask in ("y", "Y", "Yes", "yes", "yEs", "yeS", "YEs", "YeS", "YES"):
+        install_installer()
+    else:
+        print("when done please install the newest version: https://github.com/thompog/BtFk/releases/tag/verions")
+        print()
+        print()
+        print()
 
 ask = input("do you want to start menu now or go into console (Y/N) ")
 if ask == "Y" or ask == "y":
