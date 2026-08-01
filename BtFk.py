@@ -1,4 +1,4 @@
-# This is BtFk version 0.0.66
+# This is BtFk version 0.1.10
 # Console is version 0.65
 import tkinter as tk
 from tkinter import messagebox
@@ -15,8 +15,8 @@ fullpath = os.path.dirname(os.path.abspath(__file__))
 console_loation = os.path.join(os.environ["TEMP"], "console.py")
 a3 = os.path.join(fullpath, "del_console.bat")
 a2 = os.path.join(fullpath, "restart.bat")
-PVoVP_1 = "0XTf/f/ffffaaaaaa-ffffaaaaaa"
-PVOVP_2 = "0XTf/ffffaaaaaa-fffffaaaaa"
+PVoVP_1 = "0XOf/fffffffffa-0XTTfffffffffa"
+PVOVP_2 = "0XTf/ffffaaaaaa-0XTfffffaaaaa"
 
 class VersionIDError(Exception):
     pass
