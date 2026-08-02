@@ -5,7 +5,8 @@ BtFk is a simple 2 man project that does simple things with GUI thats it for now
 # How to install
 Step 1:
 
-  install Python 3.14 (https://www.python.org/ftp/python/3.14.6/python-3.14.6-amd64.exe)
+  install Python 3.14 and up 
+  we recommend using: https://www.python.org/ftp/python/3.14.6/python-3.14.6-amd64.exe
   
   run installer
 
