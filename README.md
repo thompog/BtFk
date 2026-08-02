@@ -17,7 +17,7 @@ Step 2:
   
   Press enter
   
-  Type: python -m pip install requests tkinter
+  Type: python -m pip install requests
   
   Press enter
 
