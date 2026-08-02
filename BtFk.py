@@ -1,22 +1,30 @@
-# This is BtFk version 0.1.10
+# This is BtFk version 0.1.85
 # Console is version 0.65
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import filedialog, messagebox
 import os
 import sys
 import platform
 from pathlib import Path
 import subprocess
 import hashlib
+import hmac
+import time
 import requests as requ
 
 name_of_program = os.path.basename(__file__)
 fullpath = os.path.dirname(os.path.abspath(__file__))
-console_loation = os.path.join(os.environ["TEMP"], "console.py")
-a3 = os.path.join(fullpath, "del_console.bat")
-a2 = os.path.join(fullpath, "restart.bat")
 PVoVP_1 = "0XOf/fffffffffa-0XTTfffffffffa"
 PVOVP_2 = "0XTf/ffffaaaaaa-0XTfffffaaaaa"
+APP_STATE_DIR = os.path.join(os.environ.get("LOCALAPPDATA", fullpath), "BtFk")
+WILL_NOT_DELETE_PATH = os.path.join(APP_STATE_DIR, "will_not_delete.txt")
+START_CONSOLE_BAT_PATH = os.path.join(fullpath, "start_console_mode.bat")
+RUNTIME_NAME = os.environ.get("BTFK_RUNTIME_NAME", "")
+if not RUNTIME_NAME:
+    if "--as-console" in sys.argv:
+        RUNTIME_NAME = "console"
+    else:
+        RUNTIME_NAME = os.path.splitext(name_of_program)[0]
 
 class VersionIDError(Exception):
     pass
@@ -24,57 +32,35 @@ class VersionIDError(Exception):
 class FileHashError(Exception):
     pass
 
-batch_restart = f"""
-@echo off
-title restarting
-echo trying restart
-start "" /MIN cmd /c "python {console_loation}"
-exit /b 0
-"""
+def ensure_will_not_delete_marker() -> None:
+    os.makedirs(APP_STATE_DIR, exist_ok=True)
+    if not os.path.exists(WILL_NOT_DELETE_PATH):
+        with open(WILL_NOT_DELETE_PATH, "w", encoding="utf-8") as file:
+            file.write("dont delete this is here to make BtFk check it to not delete files that it makes")
 
-batch_delete_console = f"""
-@echo off
-title deleting console and shuting down
-echo deleting console
-timeout /t 3 >nul
-if exist "{console_loation}" (
-    del /Q "{console_loation}"
-)
-if exist "{a2}" (
-    del /Q "{a2}"
-)
-echo shuting down....
-echo.
-echo.
-echo when your ready press enter this will exit the program
-echo hope you liked the program just press on it and it opens agen do not
-pause
-exit /b 0
-"""
+def ensure_console_mode_launcher() -> None:
+    launcher_content = (
+        "@echo off\r\n"
+        "setlocal\r\n"
+        "\r\n"
+        f"set \"PYTHON_EXE={sys.executable}\"\r\n"
+        "set \"SCRIPT=%~dp0BtFk.py\"\r\n"
+        "set \"BTFK_RUNTIME_NAME=console\"\r\n"
+        "\r\n"
+        "\"%PYTHON_EXE%\" \"%SCRIPT%\" --as-console\r\n"
+        "\r\n"
+        "echo.\r\n"
+        "echo Press any key to close...\r\n"
+        "pause >nul\r\n"
+    )
 
-if name_of_program != "console.py":
-    if not os.path.exists(a3):
-        with open(a3, "w") as file:
-            file.write(batch_delete_console)
+    if os.path.exists(START_CONSOLE_BAT_PATH):
+        with open(START_CONSOLE_BAT_PATH, "r", encoding="utf-8", errors="ignore") as file:
+            if file.read() == launcher_content:
+                return
 
-    import shutil
-
-    if os.path.exists(console_loation):
-        if not os.path.exists(a2):
-            with open(a2, "w") as file:
-                file.write(batch_restart)
-        
-        os.startfile(a2)
-        sys.exit(0)
-
-    shutil.copyfile(os.path.abspath(__file__), console_loation)
-
-    if not os.path.exists(a2):
-        with open(a2, "w") as file:
-            file.write(batch_restart)
-
-    os.startfile(a2)
-    sys.exit(0)
+    with open(START_CONSOLE_BAT_PATH, "w", encoding="utf-8", newline="") as file:
+        file.write(launcher_content)
 
 print("###############################################")
 
@@ -112,32 +98,68 @@ def make_it_play(root: tk.Tk, dir_path: Path):
         ".mp4", ".m4v", ".mov", ".mkv", ".avi", ".wmv", ".flv", ".webm", ".mpg", ".mpeg", ".3gp", 
         ".mp3", ".aac", ".wav", ".flac", ".m4a", ".ogg", ".opus", ".wma", ".alac", ".aiff"
     )
-    
-    end_files = [
-        f.name for f in dir_path.iterdir() 
-        if f.is_file() and f.suffix.lower() in playable_extensions
-    ]
 
-    frame = tk.Frame(root)
-    frame.pack(padx=20, pady=20)
-
-    for one_end_file in end_files:
-        full_path = os.path.join(dir_path, one_end_file)
-        button = tk.Button(
-            frame, 
-            text=f"play: {one_end_file}?", 
-            command=lambda file_to_play=full_path: play_media_file(file_to_play)
+    try:
+        media_files = sorted(
+            [
+                f for f in dir_path.iterdir()
+                if f.is_file() and f.suffix.lower() in playable_extensions
+            ],
+            key=lambda p: p.name.lower(),
         )
-        button.pack(fill="x", pady=5)
+    except Exception as exc:
+        messagebox.showerror("make it play", f"Could not read folder:\n{dir_path}\n\nError: {exc}")
+        return
+
+    if not media_files:
+        patterns = [f"*{ext}" for ext in playable_extensions]
+        selected = filedialog.askopenfilename(
+            title="Pick a media file to play",
+            initialdir=str(dir_path),
+            filetypes=[("Media files", " ".join(patterns)), ("All files", "*.*")],
+        )
+        if selected:
+            play_media_file(selected)
+        else:
+            messagebox.showinfo("make it play", "No supported media files found in this folder.")
+        return
+
+    picker = tk.Toplevel(root)
+    picker.title("Choose media file")
+    picker.geometry("560x420")
+
+    frame = tk.Frame(picker)
+    frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+    for media_path in media_files:
+        button = tk.Button(
+            frame,
+            text=f"play: {media_path.name}",
+            anchor="w",
+            command=lambda file_to_play=str(media_path): play_media_file(file_to_play),
+        )
+        button.pack(fill="x", pady=3)
 
 def verify_file_hash(file_path, expected_hash):
+    if not expected_hash:
+        return False
+
     sha256_hash = hashlib.sha256()
     with open(file_path, "rb") as f:
         for byte_block in iter(lambda: f.read(4096), b""):
             sha256_hash.update(byte_block)
-            
-    calculated_hash = sha256_hash.hexdigest()
-    return calculated_hash == expected_hash
+
+    calculated_hash = sha256_hash.hexdigest().strip().lower()
+    expected_hash_normalized = str(expected_hash).strip().lower()
+    return hmac.compare_digest(calculated_hash, expected_hash_normalized)
+
+def verify_bytes_hash(data: bytes, expected_hash: str) -> tuple[bool, str]:
+    if not expected_hash:
+        return False, ""
+
+    calculated_hash = hashlib.sha256(data).hexdigest().strip().lower()
+    expected_hash_normalized = str(expected_hash).strip().lower()
+    return hmac.compare_digest(calculated_hash, expected_hash_normalized), calculated_hash
 
 def install_installer():
     global fullpath
@@ -175,8 +197,8 @@ def install_installer():
     )
     config_file.raise_for_status()
 
-    with open(path, "w") as file:
-        file.write(config_file.text)
+    with open(path, "wb") as file:
+        file.write(config_file.content)
 
     if not verify_file_hash(
         path,
@@ -189,7 +211,7 @@ def install_installer():
             "The file has been removed."
         )
 
-    with open(path, "r") as file:
+    with open(path, "r", encoding="utf-8") as file:
         config_lines = file.read().splitlines()
 
     new_config = []
@@ -200,7 +222,7 @@ def install_installer():
 
         new_config.append(line)
 
-    with open(path, "w") as file:
+    with open(path, "w", encoding="utf-8") as file:
         file.write("\n".join(new_config))
 
     print("running installer")
@@ -219,7 +241,7 @@ def make_size(size: tuple[int, int]) -> str:
 
 def main(is_max_size: bool, start_messgae_box_auto: bool, will_delete_after_start: bool):
     root = tk.Tk()
-    root.title("BtFk - Menu/Page 1")
+    root.title(f"{RUNTIME_NAME} - Menu/Page 1")
 
     if start_messgae_box_auto:
         make_messagebox()
@@ -247,20 +269,35 @@ def get_version_ID():
 
     path = os.path.join(fullpath, "ver.BtFk.txt")
 
-    version_file = requ.get("https://raw.githubusercontent.com/thompog/BtFk/refs/heads/main/ver.BtFk.txt")
-    version_file.raise_for_status()
+    expected_version_hash = "C4F878A9D73DCCAE304F445B374FE396389C62C0A751208EAB0F7FEC9816CFCC"
+    version_bytes = b""
+    latest_calculated_hash = ""
+    verified = False
 
-    with open(path, "w") as file:
-        file.write(version_file.text)
+    for _ in range(3):
+        version_file = requ.get(
+            "https://raw.githubusercontent.com/thompog/BtFk/refs/heads/main/ver.BtFk.txt",
+            timeout=20,
+        )
+        version_file.raise_for_status()
 
-    if not verify_file_hash(
-        path,
-        "C4F878A9D73DCCAE304F445B374FE396389C62C0A751208EAB0F7FEC9816CFCC"
-    ):
-        os.remove(path)
-        raise VersionIDError("0XTffffffaaaa-0XOffffffaaaa")
+        version_bytes = version_file.content
+        verified, latest_calculated_hash = verify_bytes_hash(version_bytes, expected_version_hash)
+        if verified:
+            break
+        time.sleep(0.5)
 
-    with open(path, "r") as file:
+    with open(path, "wb") as file:
+        file.write(version_bytes)
+
+    if not verified:
+        if os.path.exists(path):
+            os.remove(path)
+        raise VersionIDError(
+            f"0XTffffffaaaa-0XOffffffaaaa (expected={expected_version_hash}, got={latest_calculated_hash.upper()})"
+        )
+
+    with open(path, "r", encoding="utf-8") as file:
         versions = file.read().splitlines()
 
     ver1 = ""
@@ -268,36 +305,13 @@ def get_version_ID():
 
     for version in versions:
         if version.startswith("PVoVP_1 = "):
-            version = version.replace("PVoVP_1 = ", "")
-            target = 1
+            ver1 = version.replace("PVoVP_1 = ", "").strip().strip('"').strip("'")
 
         elif version.startswith("PVOVP_2 = "):
-            version = version.replace("PVOVP_2 = ", "")
-            target = 2
+            ver2 = version.replace("PVOVP_2 = ", "").strip().strip('"').strip("'")
 
         else:
             continue
-
-        decoded = ""
-
-        for c in version:
-            if c in ("0", "X", "T", "H", "O"):
-                continue
-            elif c == "/":
-                decoded += "."
-            elif c == "-":
-                decoded += "."
-            elif c == "f":
-                decoded += "0"
-            elif c == "a":
-                decoded += "1"
-            else:
-                decoded += c
-
-        if target == 1:
-            ver1 = decoded
-        else:
-            ver2 = decoded
 
     if not ver1:
         raise VersionIDError(
@@ -340,7 +354,7 @@ def ask_for_commands(is_on: bool, will_delete: bool | None = None):
     else:
         delete_after_start = False
 
-    print("BtFk Console v0.65")
+    print(f"{RUNTIME_NAME} Console v0.65")
     print("Type 'help' to show all commands")
     print()
 
@@ -375,7 +389,7 @@ def ask_for_commands(is_on: bool, will_delete: bool | None = None):
             inst_start_banana_message_box = False
             print("when starting menu it will not start the message box automatically")
 
-        if command in ("start_menu TRUE", "sm TRUE", "Start_menu TRUE", "start_menu true", "Start_menu true", "SM TRUE", "SM true", "sm true"):
+        if command in ("start_menu TRUE", "sm TRUE", "Start_menu TRUE", "start_menu true", "Start_menu true", "SM TRUE", "SM true", "sm true", "start_menu", "Start_menu"):
             start_menu = True
             print("starting menu.....")
         if command in ("start_menu FALSE", "sm FALSE", "Start_menu FALSE", "start_menu false", "Start_menu false", "SM FALSE", "SM false", "sm false"):
@@ -394,17 +408,11 @@ def ask_for_commands(is_on: bool, will_delete: bool | None = None):
 
         if command in ("exit", "EX", "ex", ";;exit"):
             print("exiting......")
-            if delete_after_start:
-                if not os.path.exists(a3):
-                    with open(a3, "w") as file:
-                        file.write(batch_delete_console)
-                os.startfile(a3)
-            else:
-                if not os.path.exists("C:\\Users\\Public\\Documents\\will_not_delete.txt"):
-                    with open("C:\\Users\\Public\\Documents\\will_not_delete.txt", "w") as file:
-                        file.write("dont delete this is here to make BtFk check it to not delete files that it makes")
+            ensure_will_not_delete_marker()
 
             sys.exit(0)
+
+ensure_console_mode_launcher()
 
 if not check_version_ID():
     print("version ID is not the newest this means that you have and old version")
@@ -420,7 +428,7 @@ if not check_version_ID():
 
 ask = input("do you want to start menu now or go into console (Y/N) ")
 if ask == "Y" or ask == "y":
-    if os.path.exists("C:\\Users\\Public\\Documents\\will_not_delete.txt"):
+    if os.path.exists(WILL_NOT_DELETE_PATH):
         will_del = main(True, False, False)
     else:
         will_del = main(True, False, True)
@@ -428,11 +436,7 @@ else:
     will_del = ask_for_commands(True)
 
 if will_del:
-    if not os.path.exists(a3):
-        with open(a3, "w") as file:
-            file.write(batch_delete_console)
-    os.startfile(a3)
+    print("delete_after_start was requested, but self-delete behavior is disabled for safety.")
+    ensure_will_not_delete_marker()
 else:
-    if not os.path.exists("C:\\Users\\Public\\Documents\\will_not_delete.txt"):
-        with open("C:\\Users\\Public\\Documents\\will_not_delete.txt", "w") as file:
-            file.write("dont delete this is here to make BtFk check it to not delete files that it makes")
+    ensure_will_not_delete_marker()
